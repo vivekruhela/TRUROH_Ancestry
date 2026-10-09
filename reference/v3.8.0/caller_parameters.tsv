@@ -1,0 +1,25 @@
+tool	parameter	value	note
+all	minimum_length_bp	250000	Permissive input floor for updated adaptive TRU-ROH
+all	minimum_markers	15	Harmonized minimum informative-marker count
+plink	homozyg_window_snp	50	PLINK scanning window
+plink	homozyg_window_het	1	Maximum heterozygous calls per scanning-window hit
+plink	homozyg_window_missing	5	Maximum missing calls per scanning-window hit
+plink	homozyg_window_threshold	0.05	Minimum scanning-window hit rate
+plink	homozyg_density_kb_per_snp	50	Maximum inverse density
+plink	homozyg_gap_kb	1000	Maximum internal gap
+bcftools	gt_error_phred	30	Use GT mode because simulated VCF lacks PL
+bcftools	recombination_rate_per_bp	1e-8	Constant rate; replace with a genetic map if desired
+detectruns	window_snp	15	Sliding-window size
+detectruns	threshold	0.05	Overlapping-window threshold
+detectruns	max_opp_window	1	Maximum opposite genotypes per window
+detectruns	max_miss_window	1	Maximum missing genotypes per window
+detectruns	max_gap_bp	1000000	Maximum gap between consecutive markers
+detectruns	min_density	0.00002	One marker per 50 kb
+rzooroh	min_maf	0.01	Caller-specific marker QC before HBD modeling
+rzooroh	max_missing	0.10	Caller-specific marker QC before HBD modeling
+rzooroh	batch_count	10	Individual batches; HBD inference is sample-specific conditional on full-cohort AF
+rzooroh	K	10	HBD classes with rates base_rate^1 through base_rate^K
+rzooroh	base_rate	2	MixKL HBD-rate base
+rzooroh	genotype_error	0.001	Genotyping error probability
+rzooroh	min_length_bp	250000	Permissive common floor before adaptive TRUROH filtering
+rzooroh	min_snps	15	Permissive common floor before adaptive TRUROH filtering

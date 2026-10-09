@@ -1,0 +1,66 @@
+test_actual_worker_shell_forwards_frozen_config_and_stage (test_multicohort.MultiCohortTests.test_actual_worker_shell_forwards_frozen_config_and_stage) ... ok
+test_ch_full_pipeline_report_and_dynamic_primary_ancestry (test_multicohort.MultiCohortTests.test_ch_full_pipeline_report_and_dynamic_primary_ancestry) ... Caribbean Hispanics N=40; fixed minimum carriers=3; preflight passed
+Report written: /tmp/truroh cohorts m535m3hd/CH/out/report/TRUROH_CH_report.html
+ok
+test_ch_header_covariates_and_mapping (test_multicohort.MultiCohortTests.test_ch_header_covariates_and_mapping) ... ok
+test_dry_run_never_calls_sbatch (test_multicohort.MultiCohortTests.test_dry_run_never_calls_sbatch) ... Caribbean Hispanics N=40; fixed minimum carriers=3; preflight passed
+Dry run: preflight passed; no SLURM jobs submitted. Frozen config: /tmp/truroh cohorts h_plvo_v/CH/out/submissions/20261009T214426Z_754b6c34/config.resolved.json
+sbatch --parsable --cpus-per-task 4 --mem 64G --time 2-00:00:00 --job-name TRUROH_CH_1433 --array 1,2%4 --output '/tmp/truroh cohorts h_plvo_v/CH/out/logs/chr_%A_%a.out' --error '/tmp/truroh cohorts h_plvo_v/CH/out/logs/chr_%A_%a.err' /home/claude/repos/TRUROH_Ancestry/slurm/job.sbatch /home/claude/repos/TRUROH_Ancestry '/tmp/truroh cohorts h_plvo_v/CH/out/submissions/20261009T214426Z_754b6c34/config.resolved.json' chromosome adc65dfda1b0a76f8bfaadda2b855e4e51c6c823426cba83d80f593b4f8e9b2d
+sbatch --parsable --dependency afterany:ARRAY_JOB_ID --job-name TRUROH_CH_1433_report --cpus-per-task 4 --mem 32G --time 1-00:00:00 --output '/tmp/truroh cohorts h_plvo_v/CH/out/logs/final_%j.out' --error '/tmp/truroh cohorts h_plvo_v/CH/out/logs/final_%j.err' /home/claude/repos/TRUROH_Ancestry/slurm/job.sbatch /home/claude/repos/TRUROH_Ancestry '/tmp/truroh cohorts h_plvo_v/CH/out/submissions/20261009T214426Z_754b6c34/config.resolved.json' finalize adc65dfda1b0a76f8bfaadda2b855e4e51c6c823426cba83d80f593b4f8e9b2d
+ok
+test_explicit_custom_numeric_covariate (test_multicohort.MultiCohortTests.test_explicit_custom_numeric_covariate) ... ok
+test_flag_before_after_action_and_environment (test_multicohort.MultiCohortTests.test_flag_before_after_action_and_environment) ... ok
+test_foreign_output_fails_without_overwriting_report_or_status (test_multicohort.MultiCohortTests.test_foreign_output_fails_without_overwriting_report_or_status) ... Caribbean Hispanics N=40; fixed minimum carriers=3; preflight passed
+ok
+test_frozen_file_tampering_fails_before_output_write (test_multicohort.MultiCohortTests.test_frozen_file_tampering_fails_before_output_write) ... ok
+test_invalid_covariate_is_actionable (test_multicohort.MultiCohortTests.test_invalid_covariate_is_actionable) ... ok
+test_missing_ch_input_generates_ch_diagnostic_report (test_multicohort.MultiCohortTests.test_missing_ch_input_generates_ch_diagnostic_report) ... ok
+test_no_default_cohort_in_either_launcher (test_multicohort.MultiCohortTests.test_no_default_cohort_in_either_launcher) ... ok
+test_relative_paths_are_config_relative_and_snapshots_absolute (test_multicohort.MultiCohortTests.test_relative_paths_are_config_relative_and_snapshots_absolute) ... ok
+test_scientific_changes_block_reuse_scheduling_changes_do_not (test_multicohort.MultiCohortTests.test_scientific_changes_block_reuse_scheduling_changes_do_not) ... Caribbean Hispanics N=40; fixed minimum carriers=3; preflight passed
+ok
+test_submission_freezes_config_and_propagates_resources (test_multicohort.MultiCohortTests.test_submission_freezes_config_and_propagates_resources) ... Caribbean Hispanics N=40; fixed minimum carriers=3; preflight passed
+Array job 9001; report job 9002 (afterany); output /tmp/truroh cohorts 5fsob3ah/CH/out
+ok
+test_submit_shell_forwards_flag_and_legacy_explicit_argument (test_multicohort.MultiCohortTests.test_submit_shell_forwards_flag_and_legacy_explicit_argument) ... ok
+test_two_cohorts_have_separate_outputs (test_multicohort.MultiCohortTests.test_two_cohorts_have_separate_outputs) ... GAPP Peruvians N=40; fixed minimum carriers=3; preflight passed
+Caribbean Hispanics N=40; fixed minimum carriers=3; preflight passed
+ok
+test_ancestry_effect_at_one (test_pipeline.CoreTests.test_ancestry_effect_at_one) ... ok
+test_apoe_no_opaque_coding_guess (test_pipeline.CoreTests.test_apoe_no_opaque_coding_guess) ... ok
+test_backgrounds_deterministic_and_excluded_buffer (test_pipeline.CoreTests.test_backgrounds_deterministic_and_excluded_buffer) ... ok
+test_bh_missing_values (test_pipeline.CoreTests.test_bh_missing_values) ... ok
+test_carrier_rounding (test_pipeline.CoreTests.test_carrier_rounding) ... ok
+test_complete_linkage_no_transitive_chain (test_pipeline.CoreTests.test_complete_linkage_no_transitive_chain) ... ok
+test_exact_bed_counts_missing_and_chunk_boundaries (test_pipeline.CoreTests.test_exact_bed_counts_missing_and_chunk_boundaries) ... ok
+test_firth_intercept_and_score_gradient (test_pipeline.CoreTests.test_firth_intercept_and_score_gradient) ... ok
+test_firth_separation_analytic_odds_ratio (test_pipeline.CoreTests.test_firth_separation_analytic_odds_ratio) ... ok
+test_locked_gates_and_nan (test_pipeline.CoreTests.test_locked_gates_and_nan) ... ok
+test_seed_span_hrs (test_pipeline.CoreTests.test_seed_span_hrs) ... ok
+test_all_candidates_fail_locked_qc_still_complete (test_pipeline.IntegrationTests.test_all_candidates_fail_locked_qc_still_complete) ... GAPP Peruvians N=40; fixed minimum carriers=3; preflight passed
+Report written: /tmp/tmp51vhwd4c/out/report/TRUROH_GAPP_report.html
+ok
+test_failed_chromosome_reports_incomplete_not_zero (test_pipeline.IntegrationTests.test_failed_chromosome_reports_incomplete_not_zero) ... GAPP Peruvians N=40; fixed minimum carriers=3; preflight passed
+Report written: /tmp/tmphgpns4qk/out/report/TRUROH_GAPP_report.html
+ok
+test_full_scoring_association_reporting (test_pipeline.IntegrationTests.test_full_scoring_association_reporting) ... GAPP Peruvians N=40; fixed minimum carriers=3; preflight passed
+Report written: /tmp/tmp4bxj7qsu/out/report/TRUROH_GAPP_report.html
+ok
+test_input_change_blocks_mixed_run (test_pipeline.IntegrationTests.test_input_change_blocks_mixed_run) ... GAPP Peruvians N=40; fixed minimum carriers=3; preflight passed
+ok
+test_missing_ancestry_sample_is_not_imputed (test_pipeline.IntegrationTests.test_missing_ancestry_sample_is_not_imputed) ... ok
+test_phenotype_ids_pca_and_technical_denominator (test_pipeline.IntegrationTests.test_phenotype_ids_pca_and_technical_denominator) ... ok
+test_slurm_afterany_and_absolute_root (test_pipeline.IntegrationTests.test_slurm_afterany_and_absolute_root) ... GAPP Peruvians N=40; fixed minimum carriers=3; preflight passed
+Array job 9001; report job 9002 (afterany); output /tmp/tmp_1bihwv4/out
+ok
+test_split_preserves_samples_genotypes_and_masks_outcomes (test_pipeline.IntegrationTests.test_split_preserves_samples_genotypes_and_masks_outcomes) ... ok
+test_subset_ancestry_excludes_other_cohort (test_pipeline.IntegrationTests.test_subset_ancestry_excludes_other_cohort) ... ok
+test_unmapped_outcome_fails (test_pipeline.IntegrationTests.test_unmapped_outcome_fails) ... ok
+test_zero_candidates_complete_report (test_pipeline.IntegrationTests.test_zero_candidates_complete_report) ... GAPP Peruvians N=40; fixed minimum carriers=3; preflight passed
+Report written: /tmp/tmp1ls649rb/out/report/TRUROH_GAPP_report.html
+ok
+
+----------------------------------------------------------------------
+Ran 38 tests in 50.332s
+
+OK

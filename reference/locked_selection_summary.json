@@ -1,0 +1,19 @@
+{
+  "GRID_ID": 1433,
+  "TOOL": "bcftools",
+  "LD": "no",
+  "LENGTH_BP_MIN": 1000000,
+  "CARRIER_FRACTION_MIN": 0.005,
+  "HVR_MAX": 0.005,
+  "HRS_MIN": 0.5,
+  "RDI_MIN": 0.7,
+  "MIN_SOURCE_DOMAIN_F1": 0.16695652173913045,
+  "MEAN_SOURCE_DOMAIN_F1": 0.17535126357416825,
+  "MIN_SOURCE_DOMAIN_BALANCED_ACCURACY": 0.5485331102647484,
+  "MEAN_SOURCE_DOMAIN_BALANCED_ACCURACY": 0.5616486259593071,
+  "MEAN_SOURCE_DOMAIN_PRECISION": 0.41999677359882004,
+  "ELIGIBLE": 1,
+  "STATUS": "selected",
+  "DETAIL": "full-data deployment refit after unbiased CV; primary LD only",
+  "interpretation": "User-provided simulation selection summary, recorded for provenance; these are not measured GAPP performance statistics."
+}

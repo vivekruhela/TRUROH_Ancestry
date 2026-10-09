@@ -1,0 +1,26 @@
+{
+  "release": "TRUROH_SIM_SLURM_v3.8.0_FINAL",
+  "source_archive_sha256": "a88d8a7fb95e5c61e5e28241333a18b241e1af593114cb3f53ce7eb548a28bc7",
+  "source_archive_bytes": 211356,
+  "source_note": "Recovered saved local v3.8.0 FINAL release. Its byte size matches the attached duplicate; attachment byte identity could not independently be checked because materialization returned HTTP 502.",
+  "files_sha256": {
+    "compute_raw_metrics.py": "f1446baa947368cba922303e9dd0549ff458ec7f77238e92d80aa3fc275b0215",
+    "build_candidates.py": "319665a8b87de3681f44cace046cf6159c4e843109624c2c4f80fe1abb5cdbbc",
+    "normalize_calls.py": "45e8bd540dc241a16e501dc72950452c4e7c39070e4b4abad93ceebdbfffff0b",
+    "rfmix_utils.py": "f90d5f355584b1b965c2db83d6cba6ae6a8f72ad9a97785f84a3ffc4afbb3896",
+    "calibrate_benchmark.py": "ddfe321988635f94991604d5123d61c0b5ca5191d23bbf582e0d9f78f1445677",
+    "cross_ancestry_cv.py": "13a42f3a423cd7f18acec6ab385d03981836b224270425e316182f74f4c89cd3",
+    "prepare_ld.sh": "14bfe3c68e7fb200e1e4e3df2482b73646c46b105effd0f4626bfd2abde12df8",
+    "call_bcftools.sh": "60c1145438134a7d474df0cf6fc4c0beb693f353c9d12f9f6f0c484f7ec28c5e",
+    "config.sh": "1860c2d681f6ee2719092dfb52516ccf0d40a4ab422f405485f8763fd69f75df",
+    "caller_parameters.tsv": "cecd7c50b92170218dc173a761255fe2d40caf9eda743f9cb68e574c4bee0350"
+  },
+  "deployment_changes": [
+    "GAPP-only input adapter and phenotype preparation",
+    "ID-safe table parsing; strict subset/chromosome RFMix checks",
+    "Caller rerun from supplied unpruned PLINK, with GAPP AF from GT",
+    "Source scoring helpers and regional calculations preserved",
+    "Fixed GRID_ID 1433 selection replaces all knee/truth/tuning stages",
+    "Firth association, diagnostics, reporting and SLURM afterany finalization"
+  ]
+}

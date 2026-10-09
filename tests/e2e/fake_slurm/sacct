@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# test stub: no queued jobs
+exit 0

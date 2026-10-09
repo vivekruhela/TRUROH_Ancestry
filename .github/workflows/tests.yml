@@ -1,0 +1,19 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: environment.yml
+          activate-environment: truroh-grid1433
+          channel-priority: strict
+      - name: Unit and integration tests
+        run: bash tests/run_tests.sh
+      - name: End-to-end test (real PLINK + BCFtools, emulated sbatch)
+        run: bash tests/e2e/run_e2e.sh "$RUNNER_TEMP/e2e"

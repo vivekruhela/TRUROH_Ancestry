@@ -1,0 +1,423 @@
+#!/usr/bin/env bash
+# Central configuration for TRUROH-SIM v3.7.2.
+# Every job sources this file; environment variables may override site paths.
+
+set -euo pipefail
+
+PIPELINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Named simulation experiments ------------------------------------------------
+EXPERIMENT_TABLE="${EXPERIMENT_TABLE:-${PIPELINE_DIR}/config/experiments.tsv}"
+EXPERIMENT_ID="${EXPERIMENT_ID:-admix_n2000_r01}"
+experiment_row="$(awk -F '\t' -v id="${EXPERIMENT_ID}" 'NR>1 && $1 !~ /^#/ && $2==id {print; exit}' "${EXPERIMENT_TABLE}")"
+if [[ -z "${experiment_row}" ]]; then
+    echo "ERROR: experiment '${EXPERIMENT_ID}' is absent from ${EXPERIMENT_TABLE}" >&2
+    return 2 2>/dev/null || exit 2
+fi
+IFS=$'\t' read -r EXPERIMENT_ENABLED _ EXPERIMENT_COHORT EXPERIMENT_REPLICATE EXPERIMENT_ROLE \
+    SIM_MODEL SIM_QUERY_POP SIM_N_QUERY SIM_N_REF_AFR SIM_N_REF_EUR SIM_N_REF_NAM \
+    SIM_ADMIX_PROP_AFR SIM_ADMIX_PROP_EUR SIM_ADMIX_PROP_NAM SIM_ADMIX_GENERATIONS \
+    SIM_ADMIX_INITIAL_SIZE SIM_ADMIX_GROWTH_RATE SIM_SEED_OFFSET <<< "${experiment_row}"
+
+[[ "${SIM_MODEL}" == "source_3way" || "${SIM_MODEL}" == "american_4way" ]] || {
+    echo "ERROR: unsupported simulation model '${SIM_MODEL}' in experiment ${EXPERIMENT_ID}" >&2
+    return 2 2>/dev/null || exit 2
+}
+case "${SIM_QUERY_POP}" in AFR|EUR|NAM|ADMIX) ;; *)
+    echo "ERROR: query_population must be AFR, EUR, NAM, or ADMIX: ${SIM_QUERY_POP}" >&2
+    return 2 2>/dev/null || exit 2
+esac
+if [[ "${SIM_QUERY_POP}" == "ADMIX" && "${SIM_MODEL}" != "american_4way" ]]; then
+    echo "ERROR: an ADMIX query requires model=american_4way" >&2
+    return 2 2>/dev/null || exit 2
+fi
+for value in "${SIM_N_QUERY}" "${SIM_N_REF_AFR}" "${SIM_N_REF_EUR}" "${SIM_N_REF_NAM}" \
+             "${SIM_ADMIX_GENERATIONS}" "${SIM_ADMIX_INITIAL_SIZE}" "${SIM_SEED_OFFSET}"; do
+    [[ "${value}" =~ ^[0-9]+$ ]] || {
+        echo "ERROR: integer experiment fields must be non-negative: '${value}'" >&2
+        return 2 2>/dev/null || exit 2
+    }
+done
+(( SIM_N_QUERY > 0 )) || {
+    echo "ERROR: n_query must be positive" >&2
+    return 2 2>/dev/null || exit 2
+}
+(( SIM_N_REF_AFR == 0 && SIM_N_REF_EUR == 0 && SIM_N_REF_NAM == 0 )) || {
+    echo "ERROR: n_ref_afr/n_ref_eur/n_ref_nam must be 0 in v3.7.2; RFMix uses the external HGDP1KGP reference" >&2
+    return 2 2>/dev/null || exit 2
+}
+if [[ "${SIM_QUERY_POP}" == "ADMIX" ]]; then
+    awk -v a="${SIM_ADMIX_PROP_AFR}" -v e="${SIM_ADMIX_PROP_EUR}" -v n="${SIM_ADMIX_PROP_NAM}" \
+        'BEGIN {s=a+e+n; exit !(a>=0 && e>=0 && n>=0 && a<=1 && e<=1 && n<=1 && s>0.999999 && s<1.000001)}' || {
+        echo "ERROR: ADMIX ancestry proportions must be in [0,1] and sum to 1" >&2
+        return 2 2>/dev/null || exit 2
+    }
+fi
+
+# Only the target/query cohort is simulated. The HGDP1KGP panel is used as the
+# external RFMix reference and is never copied or regenerated here.
+SIM_N_AFR=0
+SIM_N_EUR=0
+SIM_N_NAM=0
+SIM_N_ADMIX=0
+case "${SIM_QUERY_POP}" in
+    AFR) SIM_N_AFR=$((SIM_N_AFR + SIM_N_QUERY));;
+    EUR) SIM_N_EUR=$((SIM_N_EUR + SIM_N_QUERY));;
+    NAM) SIM_N_NAM=$((SIM_N_NAM + SIM_N_QUERY));;
+    ADMIX) SIM_N_ADMIX="${SIM_N_QUERY}";;
+esac
+SIM_N_TOTAL=$((SIM_N_AFR + SIM_N_EUR + SIM_N_NAM + SIM_N_ADMIX))
+SIM_QUERY_ROLE="QUERY"
+SIM_TRUTH_ROLE="QUERY"
+
+SIM_BASE_ROOT="${SIM_BASE_ROOT:-/mnt/lustre/lab/gtosto/users/vr2592/genetic_simulations/data/truroh_simulations}"
+ANALYSIS_BASE_ROOT="${ANALYSIS_BASE_ROOT:-/mnt/lustre/lab/gtosto/users/vr2592/genetic_simulations/data_analysis/truroh_simulations}"
+SIM_BASE="${SIM_BASE:-${SIM_BASE_ROOT}/${EXPERIMENT_ID}}"
+ANALYSIS_BASE="${ANALYSIS_BASE:-${ANALYSIS_BASE_ROOT}/${EXPERIMENT_ID}}"
+RUN_ROOT="${RUN_ROOT:-${ANALYSIS_BASE}/truroh_sim_v3_7_2}"
+
+CHROMOSOMES=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22)
+CHROMOSOME_RANGE="1-22"
+# Primary benchmarking is deliberately LD-unpruned.  Secondary LD sensitivity
+# must be requested explicitly with config/config_all_ld_sensitivity.sh (or the
+# launcher's --all-ld-sensitivity option); this prevents an omitted CONFIG_FILE
+# from silently multiplying every caller array by four.
+LD_REGIMES="${LD_REGIMES:-no}"
+read -r -a LD_LEVELS <<< "${LD_REGIMES}"
+for _ld in "${LD_LEVELS[@]}"; do
+    case "${_ld}" in no|light|medium|heavy) ;; *)
+        echo "ERROR: invalid LD regime '${_ld}' in LD_REGIMES='${LD_REGIMES}'" >&2
+        return 2 2>/dev/null || exit 2
+    esac
+done
+((${#LD_LEVELS[@]} > 0)) || {
+    echo "ERROR: LD_REGIMES selected no regimes" >&2
+    return 2 2>/dev/null || exit 2
+}
+TOOLS=(plink bcftools detectruns rzooroh)
+
+# Simulation: stdpopsim + SLiM + tskit --------------------------------------
+SIMULATION_SCRIPT="${SIMULATION_SCRIPT:-${PIPELINE_DIR}/optional_simulation/simulate_populations.py}"
+WGS_CHUNK_SCRIPT="${WGS_CHUNK_SCRIPT:-${PIPELINE_DIR}/optional_simulation/write_wgs_vcf_chunk.py}"
+SIM_CHROM_PREFIX="${SIM_CHROM_PREFIX:-chr}"
+SIM_GENETIC_MAP="${SIM_GENETIC_MAP:-HapMapII_GRCh38}"
+SIM_SLIM_SCALING_FACTOR="${SIM_SLIM_SCALING_FACTOR:-10}"
+SIM_SLIM_BURN_IN="${SIM_SLIM_BURN_IN:-10}"
+SIM_RECAP_MODE="${SIM_RECAP_MODE:-skip}"
+SIM_MEAN_DEPTH="${SIM_MEAN_DEPTH:-30}"
+SIM_DEPTH_DISPERSION="${SIM_DEPTH_DISPERSION:-5}"
+SIM_REF_ERROR_RATE="${SIM_REF_ERROR_RATE:-0.001}"
+SIM_ARRAY_SITE_FRACTION="${SIM_ARRAY_SITE_FRACTION:-0.02}"
+SIM_TRUTH_TMRCA_THRESHOLD="${SIM_TRUTH_TMRCA_THRESHOLD:-300}"
+SIM_TRUTH_MIN_ROH_BP="${SIM_TRUTH_MIN_ROH_BP:-1000000}"
+SIM_TRUTH_MIN_POOL_INDIV="${SIM_TRUTH_MIN_POOL_INDIV:-5}"
+SIM_SEED_BASE="${SIM_SEED_BASE:-42}"
+WGS_CHUNK_BP="${WGS_CHUNK_BP:-5000000}"
+WGS_MIN_DP="${WGS_MIN_DP:-10}"
+WGS_MAX_SAMPLE_MISSING="${WGS_MAX_SAMPLE_MISSING:-0.20}"
+WGS_MAX_MEAN_DP="${WGS_MAX_MEAN_DP:-500}"
+WGS_PLINK_MAF="${WGS_PLINK_MAF:-0.0000001}"
+WGS_PLINK_MAC="${WGS_PLINK_MAC:-1}"
+WGS_PLINK_GENO="${WGS_PLINK_GENO:-0.10}"
+WGS_PLINK_HWE="${WGS_PLINK_HWE:-1e-6}"
+
+# Keep brace-containing defaults outside ${VAR:-default}; Bash otherwise treats
+# the first placeholder brace as the end of the parameter expansion.
+DEFAULT_ORIGINAL_VCF_PATTERN="${SIM_BASE}/chr{CHR}/wgs_data/wgs_merged/chr{CHR}.wgs.qced.vcf.gz"
+DEFAULT_ORIGINAL_PLINK_PATTERN="${SIM_BASE}/chr{CHR}/wgs_data/wgs_merged/chr{CHR}.wgs.qced.plink"
+DEFAULT_TREE_PATTERN="${SIM_BASE}/chr{CHR}/trees/chr{CHR}.recap_mut.trees"
+DEFAULT_MANIFEST_PATTERN="${SIM_BASE}/chr{CHR}/manifests/chr{CHR}.samples.truth.tsv"
+DEFAULT_ALL_MANIFEST_PATTERN="${SIM_BASE}/chr{CHR}/manifests/chr{CHR}.samples.all.tsv"
+DEFAULT_RFMIX_REFERENCE_VCF_PATTERN='/mnt/lustre/lab/gtosto/GT_ADMIX/reference_panels/HGDP_1000G_Zikun/hgdp1kgp/hgdp1kgp_chr{CHR}.filtered.SNV_INDEL.phased.shapeit5.bcf'
+DEFAULT_RFMIX_SAMPLE_MAP='/mnt/lustre/lab/gtosto/users/vr2592/refs/hgdp_tgp/hgdp_sample_mapping.txt'
+DEFAULT_RFMIX_GENETIC_MAP_FILE='/mnt/lustre/lab/gtosto/users/vr2592/refs/genetic_map_hg38_withX/genetic_map_hg38_withX_rfmix.txt'
+ORIGINAL_VCF_PATTERN="${ORIGINAL_VCF_PATTERN:-${DEFAULT_ORIGINAL_VCF_PATTERN}}"
+ORIGINAL_PLINK_PATTERN="${ORIGINAL_PLINK_PATTERN:-${DEFAULT_ORIGINAL_PLINK_PATTERN}}"
+TREE_PATTERN="${TREE_PATTERN:-${DEFAULT_TREE_PATTERN}}"
+MANIFEST_PATTERN="${MANIFEST_PATTERN:-${DEFAULT_MANIFEST_PATTERN}}"
+ALL_MANIFEST_PATTERN="${ALL_MANIFEST_PATTERN:-${DEFAULT_ALL_MANIFEST_PATTERN}}"
+RFMIX_REFERENCE_VCF_PATTERN="${RFMIX_REFERENCE_VCF_PATTERN:-${DEFAULT_RFMIX_REFERENCE_VCF_PATTERN}}"
+RFMIX_SAMPLE_MAP="${RFMIX_SAMPLE_MAP:-${DEFAULT_RFMIX_SAMPLE_MAP}}"
+RFMIX_GENETIC_MAP_FILE="${RFMIX_GENETIC_MAP_FILE:-${DEFAULT_RFMIX_GENETIC_MAP_FILE}}"
+
+# Generated tskit/SLiM VCFs contain true phased haplotypes (GT uses "|").
+# Therefore the default simulation path bypasses ShapeIT and passes the merged
+# QCed VCF directly to RFMix. Set RFMIX_QUERY_MODE=shapeit only for genuinely
+# unphased imported data that require statistical phasing.
+RFMIX_QUERY_MODE="${RFMIX_QUERY_MODE:-prephased}"
+case "${RFMIX_QUERY_MODE}" in
+    prephased)
+        DEFAULT_RFMIX_QUERY_VCF_PATTERN="${ORIGINAL_VCF_PATTERN}"
+        ;;
+    shapeit)
+        DEFAULT_RFMIX_QUERY_VCF_PATTERN="${RUN_ROOT}/ancestry/phased/chr{CHR}/chr{CHR}.shapeit5.common.vcf.gz"
+        ;;
+    *)
+        echo "ERROR: RFMIX_QUERY_MODE must be prephased or shapeit: ${RFMIX_QUERY_MODE}" >&2
+        return 2 2>/dev/null || exit 2
+        ;;
+esac
+if [[ -z "${RFMIX_QUERY_VCF_PATTERN:-}" ]]; then
+    RFMIX_QUERY_VCF_PATTERN="${DEFAULT_RFMIX_QUERY_VCF_PATTERN}"
+fi
+
+# Four LD datasets: requested 500-SNP window and 50-SNP step ------------------
+LD_WINDOW_SNPS=500
+LD_STEP_SNPS=50
+LD_R2_LIGHT=0.20
+LD_R2_MEDIUM=0.10
+LD_R2_HEAVY=0.05
+
+# ROH callers -----------------------------------------------------------------
+CALLER_MIN_LENGTH_BP=250000
+CALLER_MIN_SNPS=15
+PLINK_HOM_WINDOW_SNP=50
+PLINK_HOM_WINDOW_HET=1
+PLINK_HOM_WINDOW_MISSING=5
+PLINK_HOM_WINDOW_THRESHOLD=0.05
+PLINK_HOM_DENSITY_KB_PER_SNP=50
+PLINK_HOM_GAP_KB=1000
+BCFTOOLS_GT_ERROR_PHRED=30
+BCFTOOLS_REC_RATE=1e-8
+DETECTRUNS_WINDOW_SNP=15
+DETECTRUNS_THRESHOLD=0.05
+DETECTRUNS_MAX_OPP_WINDOW=1
+DETECTRUNS_MAX_MISS_WINDOW=1
+DETECTRUNS_MAX_GAP_BP=1000000
+DETECTRUNS_MIN_DENSITY=0.00002
+DETECTRUNS_BATCH_COUNT=10
+
+# RZooRoH 0.4.1. Calls are batched by individual and schema-union merged.
+RZOOROH_BATCH_COUNT=10
+RZ_MIN_MAF=0.01
+RZ_MAX_MISSING=0.10
+RZ_HWE_MIN_P=0
+RZ_STDPOPSIM_SPECIES="HomSap"
+RZ_STDPOPSIM_MAP="${SIM_GENETIC_MAP}"
+RZ_K=10
+RZ_BASE_RATE=2
+RZ_GENOTYPE_ERROR=0.001
+RZ_MAXITER=100
+RZ_ESTIMATE_PARAMETERS=1
+RZ_RUN_FORWARD_BACKWARD=1
+
+# Optional Shapeit5 phasing and RFMix ----------------------------------------
+SHAPEIT5_BIN="${SHAPEIT5_BIN:-/mnt/lustre/lab/gtosto/users/vr2592/packages/shapeit5/phase_common_static}"
+RFMIX_BIN="${RFMIX_BIN:-rfmix}"
+DEFAULT_SHAPEIT_REGION_PATTERN='chr{CHR}'
+DEFAULT_RFMIX_OUTPUT_PATTERN="${RUN_ROOT}/ancestry/rfmix/chr{CHR}/chr{CHR}"
+DEFAULT_RFMIX_MSP_PATTERN="${RUN_ROOT}/ancestry/rfmix/chr{CHR}/chr{CHR}.msp.tsv"
+SHAPEIT_REGION_PATTERN="${SHAPEIT_REGION_PATTERN:-${DEFAULT_SHAPEIT_REGION_PATTERN}}"
+RFMIX_OUTPUT_PATTERN="${RFMIX_OUTPUT_PATTERN:-${DEFAULT_RFMIX_OUTPUT_PATTERN}}"
+RFMIX_MSP_PATTERN="${RFMIX_MSP_PATTERN:-${DEFAULT_RFMIX_MSP_PATTERN}}"
+SHAPEIT_EXTRA_ARGS="${SHAPEIT_EXTRA_ARGS:-}"
+RFMIX_EXTRA_ARGS="${RFMIX_EXTRA_ARGS:-}"
+RFMIX_THREADS="${RFMIX_THREADS:-14}"
+RFMIX_PHASE_AUDIT_BP="${RFMIX_PHASE_AUDIT_BP:-1000000}"
+RFMIX_REQUIRE_PHASED_QUERY="${RFMIX_REQUIRE_PHASED_QUERY:-1}"
+RFMIX_WARN_COMMON_FRACTION="${RFMIX_WARN_COMMON_FRACTION:-0.01}"
+
+# Ancestry-aware TRUROH metrics ----------------------------------------------
+INITIAL_LENGTH_FLOOR_BP=250000
+ADAPTIVE_LENGTH_CEILING_BP=500000
+ADAPTIVE_LENGTH_QUANTILE=0.10
+MIN_CARRIER_FRACTION=0.0025
+MIN_CARRIERS_ABSOLUTE=3
+MERGE_GAP_BP=250000
+MERGE_ANCESTRY_TV=0.25
+RECIPROCAL_OVERLAP=0.50
+HVR_BACKGROUNDS=500
+HVR_PROPOSAL_MULTIPLIER=4
+HVR_BUFFER_BP=10000000
+HVR_SITE_RATIO_MIN=0.25
+HVR_SITE_RATIO_MAX=4.0
+HVR_MIN_SITES=10
+HVR_MIN_ESS=40
+GENOTYPE_CHUNK_VARIANTS=10000
+HVR_INDIVIDUAL_MIN_Z=-3.0
+HVR_INDIVIDUAL_MAX_P=0.99
+HVR_VALID_FRACTION_MIN=0.05
+HVR_PASS_FRACTION_MIN=0.05
+HVR_REGION_MEDIAN_Z_MIN=-2.5
+HVR_REGION_MEDIAN_P_MAX=0.95
+HVR_META_P_MAX=0.05
+SEED_MAF=0.05
+SEED_GENO=0.10
+SEED_HWE=1e-6
+SEED_LD_WINDOW=200
+SEED_LD_STEP=50
+SEED_LD_R2=0.20
+HRS_MIN_SEEDS=3
+HRS_INDIVIDUAL_MIN=0.01
+HRS_ZERO_FRACTION_MAX=0.95
+RIDGE_LAMBDA=1.0
+BAD_RDI_QUANTILE=0.95
+BAD_RDI_MIN_REGIONS=30
+BAD_RDI_MIN_CHROMOSOMES=5
+KNEE_BOOTSTRAPS=1000
+KNEE_BOOTSTRAP_SEED=108
+KNEE_MIN_VALID_BOOTSTRAP_FRACTION=0.80
+TMRCA_TRUE_THRESHOLD=150
+TMRCA_INTERMEDIATE_THRESHOLD=500
+
+# Held-out threshold-tuning grids. Values are candidates, not conclusions.
+TUNE_LENGTH_BP_GRID="${TUNE_LENGTH_BP_GRID:-250000,500000,750000,1000000}"
+TUNE_CARRIER_FRACTION_GRID="${TUNE_CARRIER_FRACTION_GRID:-0.0025,0.005,0.01}"
+TUNE_HVR_MAX_GRID="${TUNE_HVR_MAX_GRID:-0.001,0.005,0.01,0.02,0.05}"
+TUNE_HRS_MIN_GRID="${TUNE_HRS_MIN_GRID:-0.50,0.70,0.85,0.95}"
+TUNE_RDI_GRID="${TUNE_RDI_GRID:-0.20,0.30,0.40,0.50,0.60,0.70,0.80}"
+TUNE_VALIDATION_CHROMOSOMES="${TUNE_VALIDATION_CHROMOSOMES:-17,18,19,20,21,22}"
+TUNE_MIN_PREDICTED="${TUNE_MIN_PREDICTED:-1}"
+META_RUN_SUBDIR="${META_RUN_SUBDIR:-truroh_sim_v3_7_2}"
+
+# Five-fold chromosome-block and cross-ancestry validation ------------------
+CROSS_ANCESTRY_CV_EXPERIMENTS="${CROSS_ANCESTRY_CV_EXPERIMENTS:-${PIPELINE_DIR}/config/cross_ancestry_cv_experiments.tsv}"
+CROSS_ANCESTRY_CV_SCENARIOS="${CROSS_ANCESTRY_CV_SCENARIOS:-${PIPELINE_DIR}/config/cross_ancestry_cv_scenarios.tsv}"
+CROSS_ANCESTRY_CV_ROOT="${CROSS_ANCESTRY_CV_ROOT:-${ANALYSIS_BASE_ROOT}/cross_ancestry_cv_v3_7_2}"
+CV_RUN_SUBDIR="${CV_RUN_SUBDIR:-truroh_sim_v3_7_2}"
+CV_N_FOLDS="${CV_N_FOLDS:-5}"
+CV_MIN_PREDICTED_PER_DOMAIN="${CV_MIN_PREDICTED_PER_DOMAIN:-1}"
+CV_GRID_CHUNK_SIZE="${CV_GRID_CHUNK_SIZE:-64}"
+CV_PRIMARY_LD="${CV_PRIMARY_LD:-no}"
+CV_SELECTION_RULE="${CV_SELECTION_RULE:-maximin_source_domain_f1_then_mean}"
+case "${CV_PRIMARY_LD}" in no|light|medium|heavy) ;; *)
+    echo "ERROR: CV_PRIMARY_LD must be no, light, medium, or heavy" >&2
+    return 2 2>/dev/null || exit 2
+esac
+
+# Runtime and SLURM -----------------------------------------------------------
+CONDA_BASE_DIR="${CONDA_BASE_DIR:-/mnt/lustre/lab/gtosto/users/vr2592/anaconda3}"
+CONDA_ACTIVATE_SCRIPT="${CONDA_ACTIVATE_SCRIPT:-${CONDA_BASE_DIR}/bin/activate}"
+CONDA_ENV="${CONDA_ENV:-base}"
+PYTHON_BIN="${PYTHON_BIN:-${CONDA_BASE_DIR}/bin/python}"
+RSCRIPT_BIN="${RSCRIPT_BIN:-${CONDA_BASE_DIR}/bin/Rscript}"
+PLINK_BIN="${PLINK_BIN:-plink}"
+BCFTOOLS_BIN="${BCFTOOLS_BIN:-${CONDA_BASE_DIR}/bin/bcftools}"
+TABIX_BIN="${TABIX_BIN:-${CONDA_BASE_DIR}/bin/tabix}"
+BGZIP_BIN="${BGZIP_BIN:-${CONDA_BASE_DIR}/bin/bgzip}"
+SLIM_BIN="${SLIM_BIN:-slim}"
+MODULE_INIT="${MODULE_INIT:-source /etc/profile.d/modules.sh 2>/dev/null || true}"
+MODULES_COMMON="${MODULES_COMMON:-Plink/1.9.10 ShapeIT RFMIX}"
+MODULES_SIMULATION="${MODULES_SIMULATION:-SLiM}"
+MODULES_SHAPEIT="${MODULES_SHAPEIT:-}"
+MODULES_RFMIX="${MODULES_RFMIX:-}"
+# Site defaults and stage-specific resources.  The original v3.7.2 applied
+# 14 CPUs/100 GB/48 hours to nearly every stage, including single-threaded
+# SLiM calls.  These defaults keep large-memory requests only where needed.
+SLURM_CONSTRAINT="${SLURM_CONSTRAINT:-cpu16mem128a}"
+SLURM_CPUS="${SLURM_CPUS:-4}"
+SLURM_MEM="${SLURM_MEM:-32G}"
+SLURM_CONSTRAINT_SMALL="${SLURM_CONSTRAINT_SMALL:-cpu8mem64a}"
+SLURM_CONSTRAINT_LARGE="${SLURM_CONSTRAINT_LARGE:-cpu16mem128a}"
+
+SLURM_CONSTRAINT_PREFLIGHT="${SLURM_CONSTRAINT_PREFLIGHT:-cpu8mem64a}"
+SLURM_CPUS_PREFLIGHT="${SLURM_CPUS_PREFLIGHT:-1}"
+SLURM_MEM_PREFLIGHT="${SLURM_MEM_PREFLIGHT:-8G}"
+SLURM_TIME_PREFLIGHT="${SLURM_TIME_PREFLIGHT:-01:00:00}"
+
+if (( SIM_N_QUERY <= 500 )); then
+    _sim_mem_default=60G
+    _sim_constraint_default="${SLURM_CONSTRAINT_SMALL}"
+    _sim_time_default=1-00:00:00
+    _wgs_mem_default=48G
+    _wgs_constraint_default="${SLURM_CONSTRAINT_SMALL}"
+else
+    _sim_mem_default=100G
+    _sim_constraint_default="${SLURM_CONSTRAINT_LARGE}"
+    _sim_time_default=2-00:00:00
+    _wgs_mem_default=100G
+    _wgs_constraint_default="${SLURM_CONSTRAINT_LARGE}"
+fi
+
+SLURM_CPUS_SIM="${SLURM_CPUS_SIM:-1}"
+SLURM_MEM_SIM="${SLURM_MEM_SIM:-${_sim_mem_default}}"
+SLURM_CONSTRAINT_SIM="${SLURM_CONSTRAINT_SIM:-${_sim_constraint_default}}"
+SLURM_TIME_SIM="${SLURM_TIME_SIM:-${_sim_time_default}}"
+
+SLURM_CPUS_WGS_CHUNK="${SLURM_CPUS_WGS_CHUNK:-2}"
+SLURM_MEM_WGS_CHUNK="${SLURM_MEM_WGS_CHUNK:-${_wgs_mem_default}}"
+SLURM_CONSTRAINT_WGS_CHUNK="${SLURM_CONSTRAINT_WGS_CHUNK:-${_wgs_constraint_default}}"
+SLURM_TIME_WGS_CHUNK="${SLURM_TIME_WGS_CHUNK:-12:00:00}"
+SLURM_CPUS_WGS_MERGE="${SLURM_CPUS_WGS_MERGE:-4}"
+SLURM_MEM_WGS_MERGE="${SLURM_MEM_WGS_MERGE:-${_wgs_mem_default}}"
+SLURM_CONSTRAINT_WGS_MERGE="${SLURM_CONSTRAINT_WGS_MERGE:-${_wgs_constraint_default}}"
+SLURM_TIME_WGS_MERGE="${SLURM_TIME_WGS_MERGE:-12:00:00}"
+
+SLURM_CPUS_PREP="${SLURM_CPUS_PREP:-4}"
+SLURM_MEM_PREP="${SLURM_MEM_PREP:-32G}"
+SLURM_CONSTRAINT_PREP="${SLURM_CONSTRAINT_PREP:-${SLURM_CONSTRAINT_SMALL}}"
+SLURM_TIME_PREP="${SLURM_TIME_PREP:-12:00:00}"
+
+SLURM_CPUS_CALL="${SLURM_CPUS_CALL:-4}"
+SLURM_MEM_CALL="${SLURM_MEM_CALL:-32G}"
+SLURM_CONSTRAINT_CALL="${SLURM_CONSTRAINT_CALL:-${SLURM_CONSTRAINT_SMALL}}"
+SLURM_TIME_CALL="${SLURM_TIME_CALL:-1-00:00:00}"
+
+SLURM_CPUS_RZOOROH="${SLURM_CPUS_RZOOROH:-4}"
+SLURM_MEM_RZOOROH="${SLURM_MEM_RZOOROH:-48G}"
+SLURM_CONSTRAINT_RZOOROH="${SLURM_CONSTRAINT_RZOOROH:-${SLURM_CONSTRAINT_SMALL}}"
+
+SLURM_CPUS_RFMIX="${SLURM_CPUS_RFMIX:-14}"
+SLURM_MEM_RFMIX="${SLURM_MEM_RFMIX:-100G}"
+SLURM_CONSTRAINT_RFMIX="${SLURM_CONSTRAINT_RFMIX:-${SLURM_CONSTRAINT_LARGE}}"
+SLURM_TIME_ANCESTRY="${SLURM_TIME_ANCESTRY:-2-00:00:00}"
+
+SLURM_CPUS_SCORE="${SLURM_CPUS_SCORE:-4}"
+SLURM_MEM_SCORE="${SLURM_MEM_SCORE:-32G}"
+SLURM_CONSTRAINT_SCORE="${SLURM_CONSTRAINT_SCORE:-${SLURM_CONSTRAINT_SMALL}}"
+SLURM_TIME_SCORE="${SLURM_TIME_SCORE:-1-00:00:00}"
+SLURM_CPUS_METRICS="${SLURM_CPUS_METRICS:-4}"
+SLURM_MEM_METRICS="${SLURM_MEM_METRICS:-60G}"
+SLURM_CONSTRAINT_METRICS="${SLURM_CONSTRAINT_METRICS:-${SLURM_CONSTRAINT_SMALL}}"
+SLURM_TIME_METRICS="${SLURM_TIME_METRICS:-${SLURM_TIME_SCORE}}"
+# TMRCA annotation loads the chromosome tree sequence plus carrier-region
+# overlap state and can exceed the generic 32-GB scoring profile. Keep it on
+# the 128-GB node class with a dedicated, explicit allocation.
+SLURM_CPUS_TMRCA="${SLURM_CPUS_TMRCA:-4}"
+SLURM_MEM_TMRCA="${SLURM_MEM_TMRCA:-128G}"
+SLURM_CONSTRAINT_TMRCA="${SLURM_CONSTRAINT_TMRCA:-${SLURM_CONSTRAINT_LARGE}}"
+SLURM_TIME_TMRCA="${SLURM_TIME_TMRCA:-${SLURM_TIME_SCORE}}"
+MAX_TMRCA_CONCURRENCY="${MAX_TMRCA_CONCURRENCY:-4}"
+SLURM_TIME_CV="${SLURM_TIME_CV:-2-00:00:00}"
+SLURM_CPUS_CV="${SLURM_CPUS_CV:-4}"
+SLURM_MEM_CV="${SLURM_MEM_CV:-128G}"
+SLURM_CONSTRAINT_CV="${SLURM_CONSTRAINT_CV:-${SLURM_CONSTRAINT_LARGE}}"
+SLURM_TIME_TUNE="${SLURM_TIME_TUNE:-08:00:00}"
+SLURM_TIME_REPORT="${SLURM_TIME_REPORT:-02:00:00}"
+# Report rendering is a small serial job.  Do not make it compete for the
+# 14-CPU/100-GB nodes used by simulation and caller stages.
+SLURM_CONSTRAINT_REPORT="${SLURM_CONSTRAINT_REPORT:-cpu8mem64a}"
+SLURM_CPUS_REPORT="${SLURM_CPUS_REPORT:-2}"
+SLURM_MEM_REPORT="${SLURM_MEM_REPORT:-16G}"
+SLURM_CPUS_PROFILE="${SLURM_CPUS_PROFILE:-1}"
+SLURM_MEM_PROFILE="${SLURM_MEM_PROFILE:-8G}"
+SLURM_TIME_PROFILE="${SLURM_TIME_PROFILE:-02:00:00}"
+SLURM_CONSTRAINT_PROFILE="${SLURM_CONSTRAINT_PROFILE:-${SLURM_CONSTRAINT_REPORT}}"
+ENABLE_PROFILING="${ENABLE_PROFILING:-1}"
+PROFILE_ACCOUNTING_RETRIES="${PROFILE_ACCOUNTING_RETRIES:-12}"
+PROFILE_ACCOUNTING_WAIT_SECONDS="${PROFILE_ACCOUNTING_WAIT_SECONDS:-10}"
+MAX_ARRAY_CONCURRENCY="${MAX_ARRAY_CONCURRENCY:-12}"
+MAX_SIM_CONCURRENCY="${MAX_SIM_CONCURRENCY:-2}"
+MAX_WGS_CONCURRENCY="${MAX_WGS_CONCURRENCY:-4}"
+# Protect the scheduler controller when a multi-experiment graph submits many
+# arrays. Transient EAGAIN/controller-busy failures are retried; other sbatch
+# errors remain immediate hard failures.
+SBATCH_SUBMIT_MAX_ATTEMPTS="${SBATCH_SUBMIT_MAX_ATTEMPTS:-12}"
+SBATCH_SUBMIT_RETRY_SECONDS="${SBATCH_SUBMIT_RETRY_SECONDS:-20}"
+SBATCH_SUBMIT_RETRY_MAX_SECONDS="${SBATCH_SUBMIT_RETRY_MAX_SECONDS:-180}"
+SBATCH_SUBMIT_PAUSE_SECONDS="${SBATCH_SUBMIT_PAUSE_SECONDS:-3}"
+MULTI_EXPERIMENT_SUBMIT_PAUSE_SECONDS="${MULTI_EXPERIMENT_SUBMIT_PAUSE_SECONDS:-5}"
+AUTO_ROLLBACK_PARTIAL_SUBMISSION="${AUTO_ROLLBACK_PARTIAL_SUBMISSION:-1}"
+PREVENT_ACTIVE_TRUROH_OVERLAP="${PREVENT_ACTIVE_TRUROH_OVERLAP:-1}"
+TMP_BASE="${TMP_BASE:-/mnt/lustre/lab/gtosto/GT_ADMIX/RuhelaVivek_Research/tmp}"
+FORCE="${FORCE:-0}"
+
+export PIPELINE_DIR EXPERIMENT_TABLE EXPERIMENT_ID SIM_BASE_ROOT ANALYSIS_BASE_ROOT
+export SIM_BASE ANALYSIS_BASE RUN_ROOT PYTHON_BIN RSCRIPT_BIN PLINK_BIN
+export BCFTOOLS_BIN TABIX_BIN BGZIP_BIN SLIM_BIN TMP_BASE FORCE
+export CONDA_BASE_DIR CONDA_ACTIVATE_SCRIPT CONDA_ENV
+export SIM_MODEL SIM_QUERY_POP SIM_QUERY_ROLE SIM_TRUTH_ROLE SIM_N_QUERY
+export SIM_N_REF_AFR SIM_N_REF_EUR SIM_N_REF_NAM SIM_N_AFR SIM_N_EUR SIM_N_NAM
+export SIM_N_ADMIX SIM_N_TOTAL SIM_ADMIX_PROP_AFR SIM_ADMIX_PROP_EUR
+export SIM_ADMIX_PROP_NAM SIM_ADMIX_GENERATIONS SIM_ADMIX_INITIAL_SIZE
+export SIM_ADMIX_GROWTH_RATE SIM_SEED_OFFSET

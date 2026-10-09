@@ -1,0 +1,10 @@
+{
+  "GRID_ID": 1433,
+  "TOOL": "bcftools",
+  "LD": "no",
+  "LENGTH_BP_MIN": 1000000,
+  "CARRIER_FRACTION_MIN": 0.005,
+  "HVR_MAX": 0.005,
+  "HRS_MIN": 0.5,
+  "RDI_MIN": 0.7
+}

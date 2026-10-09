@@ -1,0 +1,39 @@
+{
+  "package_version": "2.0.0",
+  "validated_date_utc": "2026-10-01",
+  "scientific_files_unchanged": {
+    "src/build_candidates.py": "ea1510a368a2e8f6c53b927f818b2eac83c578464a2f39e3969d30a4075e52cc",
+    "src/compute_raw_metrics.py": "cdc47962d1169d4072cf2a482d83380aa8ecf93064366d2276b48d61a4d21115",
+    "src/regional_scoring.py": "c498df99e6fab75a79fab34e0945ff9f53fabe42f16b90dd98c4f294bec146de",
+    "src/scoring_math.py": "e05037fabaa6e3d432e0aeeb97e0dbe20514b20bf7680476d79f28a9e465ccde",
+    "src/firth.py": "89b4537e4a4397e170922d0ebcff820118aae2f4b3272dedea9c741d15bf8447",
+    "src/rfmix_utils.py": "f90d5f355584b1b965c2db83d6cba6ae6a8f72ad9a97785f84a3ffc4afbb3896",
+    "config/locked_grid1433.json": "d482403fabd991707ce8fc672c4aba897f4ad96069fe53109cd44d83fe62b870"
+  },
+  "locked_pipeline_functions_ast_identical": {
+    "apply_locked": true,
+    "seed_panel": true
+  },
+  "reference_files_unchanged": {
+    "reference/v3.8.0/config.sh": "1860c2d681f6ee2719092dfb52516ccf0d40a4ab422f405485f8763fd69f75df",
+    "reference/v3.8.0/calibrate_benchmark.py": "ddfe321988635f94991604d5123d61c0b5ca5191d23bbf582e0d9f78f1445677",
+    "reference/v3.8.0/build_candidates.py": "319665a8b87de3681f44cace046cf6159c4e843109624c2c4f80fe1abb5cdbbc",
+    "reference/v3.8.0/normalize_calls.py": "45e8bd540dc241a16e501dc72950452c4e7c39070e4b4abad93ceebdbfffff0b",
+    "reference/v3.8.0/prepare_ld.sh": "14bfe3c68e7fb200e1e4e3df2482b73646c46b105effd0f4626bfd2abde12df8",
+    "reference/v3.8.0/caller_parameters.tsv": "cecd7c50b92170218dc173a761255fe2d40caf9eda743f9cb68e574c4bee0350",
+    "reference/v3.8.0/cross_ancestry_cv.py": "13a42f3a423cd7f18acec6ab385d03981836b224270425e316182f74f4c89cd3",
+    "reference/v3.8.0/rfmix_utils.py": "f90d5f355584b1b965c2db83d6cba6ae6a8f72ad9a97785f84a3ffc4afbb3896",
+    "reference/v3.8.0/compute_raw_metrics.py": "f1446baa947368cba922303e9dd0549ff458ec7f77238e92d80aa3fc275b0215",
+    "reference/v3.8.0/call_bcftools.sh": "60c1145438134a7d474df0cf6fc4c0beb693f353c9d12f9f6f0c484f7ec28c5e"
+  },
+  "python_3_11_grammar_check": "passed; execution performed with the Python version in build_environment.json",
+  "uploaded_ch_inputs_and_mappings_preserved": true,
+  "uploaded_ch_resource_settings_preserved": true,
+  "real_hpc_inputs_accessed": false,
+  "live_slurm_executed": false,
+  "external_plink_bcftools_executed": false,
+  "test_count": 38,
+  "test_result": "passed",
+  "python_compileall": "passed",
+  "bash_syntax": "passed"
+}

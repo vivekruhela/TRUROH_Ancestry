@@ -1,0 +1,85 @@
+{
+  "project": "MY_COHORT",
+  "cohort_label": "My study cohort",
+  "genome_build": "GRCh38",
+  "chromosomes": "1-22",
+  "plink_prefix": "/absolute/path/to/cohort",
+  "phenotype_file": "/absolute/path/to/phenotypes.tsv",
+  "pca_file": "/absolute/path/to/cohort.eigenvec",
+  "output_root": "/absolute/path/to/new_cohort_output",
+  "rfmix_msp_pattern": "/absolute/path/to/ancestry/chr{CHR}.msp.tsv",
+  "rfmix_sample_map": "",
+  "gene_annotation_file": "",
+  "columns": {
+    "fid": "FID",
+    "iid": "IID",
+    "outcome": "AD",
+    "age": "Age",
+    "sex": "Sex",
+    "apoe_genotype": "APOE_genotype",
+    "covariates": {}
+  },
+  "outcome_map": {
+    "0": 0,
+    "1": 1
+  },
+  "sex_map": {
+    "1": 0,
+    "2": 1
+  },
+  "missing_values": [
+    "",
+    "NA",
+    "N/A",
+    "NaN",
+    "nan",
+    "-9",
+    ".",
+    "None"
+  ],
+  "association": {
+    "enabled": true,
+    "covariates": [
+      "AGE",
+      "SEX",
+      "PC1",
+      "PC2",
+      "PC3",
+      "PC4",
+      "PC5"
+    ],
+    "ancestries": [
+      "NAM",
+      "EUR",
+      "AFR"
+    ],
+    "primary_ancestry": "NAM",
+    "global_reference": "EUR",
+    "run_apoe_sensitivity": true,
+    "min_carriers": 3,
+    "min_noncarriers": 3,
+    "min_weighted_carriers": 3.0,
+    "max_iterations": 300,
+    "score_tolerance": 1e-05,
+    "alpha": 0.05,
+    "max_fit_seconds": 60
+  },
+  "tools": {
+    "plink": "plink",
+    "bcftools": "bcftools"
+  },
+  "resources": {
+    "cpus": 4,
+    "memory": "64G",
+    "time": "2-00:00:00",
+    "max_concurrent": 4,
+    "partition": "",
+    "account": "",
+    "final_cpus": 4,
+    "final_memory": "32G",
+    "final_time": "1-00:00:00",
+    "constraint": "",
+    "final_constraint": ""
+  },
+  "keep_intermediate_vcf": false
+}
