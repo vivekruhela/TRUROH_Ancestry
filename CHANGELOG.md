@@ -1,5 +1,13 @@
 # Changes
 
+## 2.2.0 — 2026-10-18 UTC
+
+Output change: association tables. ROH calling, scoring and the locked GRID_ID 1433 gates are unchanged.
+
+- `association.primary_ancestry` accepts `"auto"`. It picks the configured ancestry with the highest mean global ancestry across the cohort FAM samples (RFMix MSP-derived, aliases collapsed) and never uses the outcome. Explicit values work as before, and a note is recorded when an explicit choice is not the cohort majority. The selection and the mean global ancestries are written to `results/primary_ancestry_selection.json` and `association_models.json`. The report resolves the primary ancestry the same way.
+- Removed all multiple-testing correction: the `Q_VALUE` (BH), `BONFERRONI_P` and `FDR_ASSOCIATED` columns, `results/AD_associated_FDR.tsv`, and `firth.bh`. P values are nominal. Cohort size and the number of high-confidence regions give no power after correction, and the paper reports nominal associations.
+- Tests: `test_auto_primary_ancestry_and_nominal_only_outputs`, `test_explicit_primary_ancestry_is_kept_and_noted` and `test_auto_primary_ancestry_config_validation`. Removed the BH unit test.
+
 ## 2.1.0 — 2026-10-18 UTC
 
 Analysis change, so the run signature changes. Reruns need a new output directory.

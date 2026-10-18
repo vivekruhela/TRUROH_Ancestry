@@ -37,7 +37,7 @@ The suite uses synthetic PLINK BED/BIM/FAM, RFMix MSP, phenotype and eigenvector
 | Ancestry | Cohort MSP subsetting, local proportions and missing-sample failure |
 | Firth estimation | Analytic separation odds ratio, intercept-only estimate and adjusted-score numerical gradient |
 | Ancestry effects | Centered-model effect at ancestry proportion one matches the uncentered parameter combination |
-| Multiplicity | Expected Benjamini–Hochberg adjustment while preserving missing tests |
+| Primary ancestry / P values | `auto` selects the highest mean global ancestry; explicit choices are kept and noted; no multiple-testing columns or FDR outputs (v2.2.0) |
 | Integration | Synthetic two-chromosome metrics, selected regions, association and reports |
 | Empty/failed analyses | Zero candidates and all-QC-fail runs complete with valid schemas; missing chromosomes remain incomplete rather than biological zeros |
 

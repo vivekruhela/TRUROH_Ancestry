@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'src'))
 from common import *
 from ancestry import subset_msp,combine_ancestry
 from phenotypes import prepare_phenotypes,apoe4
-from firth import fit,bh,objective
+from firth import fit,objective
 from pipeline import preflight,score,finalize,normalize_bcftools,apply_locked,submit
 from compute_raw_metrics import build_interval_counts,hrs_for_region,sample_backgrounds,stable_seed
 from build_candidates import complete_linkage,reciprocal
@@ -117,8 +117,6 @@ class CoreTests(unittest.TestCase):
   self.assertAlmostEqual(np.median(robust[ok]),np.median(y),delta=.2);self.assertEqual(fb.sum(),0)
   clean=df[ok];base,_=loco_adjust(clean,'Y',X[ok],1.0)
   np.testing.assert_allclose(robust[ok]-np.median(y),base-np.median(y[ok]),atol=1e-9)  # identical fit to dropping them
- def test_bh_missing_values(self):
-  np.testing.assert_allclose(bh([.01,.04,np.nan,.03]),[.03,.04,np.nan,.04],equal_nan=True)
  def test_apoe_no_opaque_coding_guess(self):
   self.assertEqual(apoe4('3/4'),1);self.assertEqual(apoe4('E4/E4'),2);self.assertTrue(np.isnan(apoe4('1')))
  def test_ancestry_effect_at_one(self):

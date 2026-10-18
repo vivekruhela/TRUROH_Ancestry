@@ -89,13 +89,15 @@ A nonfinite component yields unavailable RDI; a zero component yields zero RDI. 
 
 High confidence is the conjunction of technical assessability, length>=1 Mb, carriers>=max(3,ceil(0.005N)), median raw HVR<=0.005, mean raw HRS>=0.5, and RDI_A>=0.7. Missing values never pass. No knee calculation, source-domain reselection, simulation-truth operation or AD-conditioned tuning is called.
 
-## Association, intervals and multiplicity
+## Association, intervals and multiple testing
 
 Only high-confidence regions proceed to the configured Firth models. For ancestry a, centering L_a at 1 makes the ROH coefficient equal to the contrast beta_ROH+beta_ROH×LA in the uncentered model. The model includes the local main effect, interaction, age, sex, PC1–PC5, and K−1 global ancestry components. Participants are not classified by dominant ancestry. Minimum weighted carrier support is 3; local-ancestry support and LA=1 extrapolation are reported.
 
 Firth estimation maximizes logistic log likelihood plus 0.5 log determinant(X'WX). The adjusted score is X'[y−p+h(0.5−p)], where h is the diagonal of the weighted hat matrix. The constrained null fit preserves the same full design and information determinant; the 1-df likelihood-ratio statistic compares the two penalized likelihoods. The reported intervals use the inverse information matrix and are explicitly Wald approximations. These are not profile-likelihood confidence intervals. [Firth regression implementation/reference documentation](https://cran.r-project.org/web/packages/logistf/logistf.pdf)
 
-Rank-deficient designs, insufficient carrier support, single outcome classes, insufficient complete samples, timeouts and nonconvergence produce explicit statuses. No failed fit enters nominal/FDR findings. BH correction and Bonferroni values are reported within the documented families. Tests use standard independent-subject logistic modeling; a kinship-aware analysis would be a separate design.
+Rank-deficient designs, insufficient carrier support, single outcome classes, insufficient complete samples, timeouts and nonconvergence produce explicit statuses. No failed fit enters the nominal findings. Since v2.2.0, P values are nominal only. No BH, Bonferroni or Holm correction is applied, because cohort size and the number of high-confidence regions give corrected tests essentially no power. Associations are exploratory and are assessed by replication across cohorts.
+
+The primary-ancestry table holds the local-ancestry models for one ancestry. It is either given explicitly or, with `primary_ancestry: auto`, set to the configured ancestry with the highest mean MSP-derived global ancestry across the cohort FAM samples, after alias collapsing. The selection does not use the outcome and is recorded in `results/primary_ancestry_selection.json`. Tests use standard independent-subject logistic modeling; a kinship-aware analysis would be a separate design.
 
 FROH summaries use union lengths within each subject/chromosome to avoid counting overlapping segments twice, divided by the sum of GRCh38 reference chromosome lengths for the configured autosomes. The HC burden is explicitly the union of member segment lengths for retained regions; it is distinct from the length of shared representative intervals.
 

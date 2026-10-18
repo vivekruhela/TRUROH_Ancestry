@@ -207,7 +207,7 @@ def main() -> None:
     covs = ask("association.covariates", "Baseline covariates (comma-separated)", ",".join(base_cov + [k for k in extra if k not in base_cov]))
     anc_default = ta.get("ancestries") or [c for c in ["NAM", "EUR", "AFR"]]
     ancestries = ask("association.ancestries", "Ancestries for local-ancestry models", ",".join(anc_default))
-    primary = ask("association.primary_ancestry", "Primary ancestry", ta.get("primary_ancestry", ancestries.split(",")[0]))
+    primary = ask("association.primary_ancestry", "Primary ancestry (one of the ancestries above, or 'auto' = highest mean global ancestry in the cohort)", ta.get("primary_ancestry", ancestries.split(",")[0]))
     reference = ask("association.global_reference", "Reference ancestry for global-ancestry terms", ta.get("global_reference", "EUR"))
 
     print("\n4/6  Output")
