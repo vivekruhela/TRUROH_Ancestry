@@ -1,4 +1,8 @@
-"""Unmodified v3.8.0 statistical helper functions; no knee or truth code."""
+"""v3.8.0 statistical helper functions; no knee or truth code.
+
+Only change from v3.8.0 (v2.1.0): loco_adjust can leave rows with |y| > train_abs_max out of the ridge
+*training* set. Every row is still adjusted, and the centring median still uses all finite rows.
+"""
 from __future__ import annotations
 import math
 import numpy as np
@@ -46,15 +50,19 @@ def feature_matrix(df: pd.DataFrame, q_cols: list[str], la_cols: list[str]) -> t
     return np.column_stack(arrays), names
 
 
-def loco_adjust(df: pd.DataFrame, y_col: str, X: np.ndarray, ridge_lambda: float) -> tuple[np.ndarray, np.ndarray]:
+def loco_adjust(df: pd.DataFrame, y_col: str, X: np.ndarray, ridge_lambda: float,
+                train_abs_max: float | None = None) -> tuple[np.ndarray, np.ndarray]:
     y = pd.to_numeric(df[y_col], errors="coerce").to_numpy(float)
     chrom = pd.to_numeric(df["CHR"], errors="coerce").to_numpy(int)
     adjusted = y.copy()
     fallback = np.ones(len(df), dtype=int)
     center = float(np.nanmedian(y)) if np.any(np.isfinite(y)) else math.nan
+    # Z_H divides by max(1.4826*wMAD, 1e-6), so a near-constant background gives |Z_H| up to ~1e5. A handful of
+    # such rows dominates the least-squares intercept and shifts every adjusted score; keep them out of training.
+    trainable = np.isfinite(y) if train_abs_max is None else np.isfinite(y) & (np.abs(y) <= train_abs_max)
     for c in np.unique(chrom):
         test = chrom == c
-        train = ~test & np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+        train = ~test & trainable & np.all(np.isfinite(X), axis=1)
         predmask = test & np.isfinite(y) & np.all(np.isfinite(X), axis=1)
         if train.sum() < max(20, X.shape[1] + 5) or predmask.sum() == 0:
             continue

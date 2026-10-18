@@ -230,7 +230,8 @@ def score(cfg):
     table(root/'results/individual_scored.tsv.gz',indiv);table(root/'results/members.tsv.gz',members)
     table(root/'results/locked_thresholds.tsv',pd.DataFrame([dict(LOCK,N_SAMPLES=len(fam),N_CARRIERS_MIN=carrier_min(len(fam)),THRESHOLD_SOURCE='locked simulation deployment refit; no real-data tuning')]))
     fallback={c:int(indiv[c].sum()) for c in indiv if c.endswith('_LOCO_FALLBACK')}
-    atomic_json(root/'results/scoring_audit.json',{'candidate_regions':len(scored),'high_confidence_regions':int(scored.HIGH_CONFIDENCE.sum()),'technical_N':len(fam),'LOCO_features':features,'LOCO_fallback_rows':fallback,'all_gates_required':True,'no_new_knee':True})
+    cap=TECH['loco_train_abs_max'];excluded={c:int((pd.to_numeric(indiv[c],errors='coerce').abs()>cap).sum()) for c in ['Z_H','Z_S','HRS'] if c in indiv}
+    atomic_json(root/'results/scoring_audit.json',{'candidate_regions':len(scored),'high_confidence_regions':int(scored.HIGH_CONFIDENCE.sum()),'technical_N':len(fam),'LOCO_features':features,'LOCO_fallback_rows':fallback,'LOCO_train_abs_max':cap,'LOCO_training_excluded_rows':excluded,'all_gates_required':True,'no_new_knee':True})
     burden(cfg,fam,scored,members)
     return scored,members,ancestry
 
