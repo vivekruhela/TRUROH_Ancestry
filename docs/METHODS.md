@@ -66,6 +66,8 @@ Global ancestry is the genome-wide fraction of covered haplotype bases from the 
 
 The feature vector includes K−1 global proportions, K−1 local-minus-global proportions, local/global total-variation divergence, and normalized local ancestry entropy. Ridge regression (lambda=1) is fitted on other chromosomes, using training-only standardization, for Z_H, the empirical-p-derived normal score Z_S, and HRS. Adjustment is source median(y)+y−prediction, with adjusted HRS clipped to [0,1].
 
+Since v2.1.0, rows with |y|>100 are left out of the ridge **training** set (`loco_train_abs_max`); they are still adjusted, and the centring median still uses all finite rows. Z_H divides by max(1.4826·wMAD, 10⁻⁶), so a near-constant background gives |Z_H| up to ~10⁵. In v2.0.0 a few such rows dominated the least-squares intercept and shifted every adjusted Z_H (ADSP African American: 148 of 885,159 rows moved the median Z_H_A from 3.0 to −11.8, giving RDI_A = 0 for 98% of candidates). Re-scoring the Caribbean Hispanic and GAPP runs with v2.1.0 returns the same high-confidence regions. The number of excluded rows is written to `results/scoring_audit.json`.
+
 The source fallback to raw scores is retained when fewer than max(20, number_of_features+5) valid training rows are available. Every fallback is exported and counted. The centering median follows the original implementation (all finite rows); this is an outcome-free centering operation, not new threshold training. A chromosome subset run may have many such fallbacks and is labeled accordingly.
 
 ## RDI and locked selection

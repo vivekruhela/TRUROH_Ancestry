@@ -1,5 +1,14 @@
 # Changes
 
+## 2.1.0 — 2026-10-18 UTC
+
+Analysis change, so the run signature changes. Reruns need a new output directory.
+
+- LOCO ancestry adjustment: rows with |score| > 100 (`TECH['loco_train_abs_max']`) are left out of the ridge **training** set. They are still adjusted, and the centring median is unchanged. `Z_H` divides by max(1.4826·wMAD, 1e-6), so a near-constant background gives |Z_H| up to ~1e5. In v2.0.0 a few such rows dominated the least-squares intercept. In ADSP African Americans (N = 3,772), 148 of 885,159 carrier rows moved the median adjusted Z_H from 3.0 to −11.8. That set RDI_A ≈ 0 for 98% of candidates and gave zero high-confidence regions.
+- Re-scoring the Caribbean Hispanic (1 region) and GAPP (81 regions) runs gives the same high-confidence regions.
+- `results/scoring_audit.json` records `LOCO_train_abs_max` and `LOCO_training_excluded_rows`.
+- New regression test `test_loco_ignores_extreme_scores_in_training`.
+
 ## 2.0.0 public packaging — 2026-10-09 UTC
 
 No change to the analysis code, locked thresholds or run signature equations.

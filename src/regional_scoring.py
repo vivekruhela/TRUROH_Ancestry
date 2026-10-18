@@ -14,7 +14,7 @@ def score_regions(regions, indiv, ancestry, args, n_min):
     X, feature_names = feature_matrix(indiv, q_cols, la_cols)
     indiv["Z_S"] = norm.ppf(1.0 - np.clip(pd.to_numeric(indiv["EMP_P"], errors="coerce"), 1e-30, 1 - 1e-16))
     for source, target in [("Z_H", "Z_H_A"), ("Z_S", "Z_S_A"), ("HRS", "HRS_A")]:
-        adjusted, fallback = loco_adjust(indiv, source, X, args.ridge_lambda)
+        adjusted, fallback = loco_adjust(indiv, source, X, args.ridge_lambda, args.loco_train_abs_max)
         if source == "HRS":
             adjusted = np.clip(adjusted, 0.0, 1.0)
         indiv[target] = adjusted

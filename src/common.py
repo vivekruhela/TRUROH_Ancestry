@@ -14,7 +14,7 @@ TECH=dict(caller_length=250000,caller_snps=15,gt_error=30,rec_rate=1e-8,
     min_sites=10,min_ess=40,individual_min_z=-3.0,individual_max_p=0.99,
     hvr_valid_min=0.05,hvr_pass_min=0.05,hvr_indiv_z=-3.0,hvr_indiv_p=0.99,
     hvr_region_z=-2.5,hvr_region_p=0.95,hvr_meta_p=0.05,hrs_min=0.01,hrs_min_seeds=3,
-    hrs_zero_max=0.95,ridge_lambda=1.0,seed_maf=0.05,seed_geno=0.10,seed_hwe=1e-6,
+    hrs_zero_max=0.95,ridge_lambda=1.0,loco_train_abs_max=100.0,seed_maf=0.05,seed_geno=0.10,seed_hwe=1e-6,
     seed_window=200,seed_step=50,seed_r2=0.20,seed=108,chunk_variants=10000)
 CHROM_LENGTHS=dict(enumerate([248956422,242193529,198295559,190214555,181538259,170805979,159345973,145138636,138394717,133797422,135086622,133275309,114364328,107043718,101991189,90338345,83257441,80373285,58617616,64444167,46709983,50818468],1))
 ALIASES={'AMR':'NAM','America':'NAM','American':'NAM','Native_American':'NAM','NAM':'NAM',

@@ -107,6 +107,16 @@ class CoreTests(unittest.TestCase):
   X=np.column_stack([np.ones(8),np.arange(8)/8]);b=np.array([.2,-.3]);ll,g,_=objective(b,X,y);eps=1e-5
   numeric=np.array([(objective(b+np.eye(2)[i]*eps,X,y)[0]-objective(b-np.eye(2)[i]*eps,X,y)[0])/(2*eps) for i in range(2)])
   np.testing.assert_allclose(g,numeric,atol=1e-7)
+ def test_loco_ignores_extreme_scores_in_training(self):
+  from scoring_math import loco_adjust
+  rng=np.random.default_rng(7);n=2000;chrom=np.repeat(np.arange(1,5),n//4);X=rng.random((n,3))
+  y=3+X@np.array([.5,-.3,.2])+rng.normal(0,.5,n);y[rng.choice(n,8,replace=False)]=3e5   # MAD-floor blow-ups
+  df=pd.DataFrame({'CHR':chrom,'Y':y});ok=np.abs(y)<100
+  naive,_=loco_adjust(df,'Y',X,1.0);robust,fb=loco_adjust(df,'Y',X,1.0,TECH['loco_train_abs_max'])
+  self.assertLess(np.median(naive[ok]),-10)                                  # the v2.0.0 failure mode
+  self.assertAlmostEqual(np.median(robust[ok]),np.median(y),delta=.2);self.assertEqual(fb.sum(),0)
+  clean=df[ok];base,_=loco_adjust(clean,'Y',X[ok],1.0)
+  np.testing.assert_allclose(robust[ok]-np.median(y),base-np.median(y[ok]),atol=1e-9)  # identical fit to dropping them
  def test_bh_missing_values(self):
   np.testing.assert_allclose(bh([.01,.04,np.nan,.03]),[.03,.04,np.nan,.04],equal_nan=True)
  def test_apoe_no_opaque_coding_guess(self):
