@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -247,7 +248,9 @@ class MultiCohortTests(unittest.TestCase):
         assoc = read_table(root / 'results/associations.tsv')
         self.assertFalse({'Q_VALUE', 'BONFERRONI_P', 'FDR_ASSOCIATED'} & set(assoc.columns))
         self.assertFalse((root / 'results/AD_associated_FDR.tsv').exists())
-        self.assertNotIn('FDR', (root / 'report/TRUROH_CH_report.html').read_text())
+        # embedded base64 figures can contain any letter sequence; check only the report text
+        page = re.sub(r'data:[\w/+.-]+;base64,[A-Za-z0-9+/=]+', '', (root / 'report/TRUROH_CH_report.html').read_text())
+        self.assertNotIn('FDR', page)
 
     def test_explicit_primary_ancestry_is_kept_and_noted(self):
         self.cfg['association'].update(primary_ancestry='AFR', ancestries=['NAM', 'EUR', 'AFR'])
