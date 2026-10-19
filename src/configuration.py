@@ -167,12 +167,14 @@ def read_config(path):
         if not isinstance(value, str) or not re.fullmatch(r'[A-Za-z0-9_]+', value):
             raise ValueError(f'Invalid ancestry label: {value!r}')
     association['ancestries'] = [canonical(x) for x in association['ancestries']]
-    association['primary_ancestry'] = canonical(association['primary_ancestry'])
+    # "auto": resolved after scoring from the cohort's mean global ancestry (ancestry.resolve_primary_ancestry)
+    auto = association['primary_ancestry'].lower() == 'auto'
+    association['primary_ancestry'] = 'auto' if auto else canonical(association['primary_ancestry'])
     association['global_reference'] = canonical(association['global_reference'])
     if len(set(association['ancestries'])) != len(association['ancestries']):
         raise ValueError('association.ancestries contains duplicate ancestry aliases')
-    if association['primary_ancestry'] not in association['ancestries']:
-        raise ValueError('primary_ancestry must be listed in association.ancestries')
+    if not auto and association['primary_ancestry'] not in association['ancestries']:
+        raise ValueError('primary_ancestry must be "auto" or listed in association.ancestries')
     for key in ['min_carriers', 'min_noncarriers', 'max_iterations']:
         if type(association[key]) is not int or association[key] < 1:
             raise ValueError(f'association.{key} must be a positive integer')

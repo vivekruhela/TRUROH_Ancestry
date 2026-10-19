@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use TRU-ROH, please cite the accompanying manuscript and this software."
 title: "TRU-ROH: ancestry-aware high-confidence runs of homozygosity (locked GRID_ID 1433)"
-version: 2.1.0
+version: 2.2.0
 date-released: 2026-10-18
 repository-code: "https://github.com/vivekruhela/TRUROH_Ancestry"
 authors:

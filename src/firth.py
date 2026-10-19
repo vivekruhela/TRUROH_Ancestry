@@ -53,11 +53,4 @@ def fit(X,y,max_iter=300,tol=1e-5,max_seconds=60,test_index=None):
   out.update({'LR':max(0.,lr),'p_value':float(chi2.sf(max(0.,lr),1)),'null_iterations':null_iter,'null_max_score':null_residual})
  return out
 
-def bh(values):
- p=np.asarray(values,float);q=np.full(len(p),np.nan);ix=np.flatnonzero(np.isfinite(p))
- if not len(ix):return q
- order=ix[np.argsort(p[ix],kind='stable')];m=len(order)
- q[order]=np.minimum(1,np.minimum.accumulate((p[order]*m/np.arange(1,m+1))[::-1])[::-1])
- return q
-
 def safe_exp(x):return float(np.exp(x)) if x<709 else math.inf

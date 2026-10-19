@@ -4,7 +4,50 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from rfmix_utils import MSPData, _iid_from_hap, safe_ancestry_label
-from common import table, render, canonical
+from common import table, render, canonical, atomic_json, read_table
+
+PRIMARY_CLOSE_MARGIN = 0.05   # top-two mean global ancestry closer than this -> "auto" choice is flagged as a close call
+
+
+def resolve_primary_ancestry(cfg, write=True):
+    """Primary ancestry for the association tables.
+
+    Explicit config value: used as given (a pre-specified hypothesis); a note is recorded when it is not the
+    cohort-majority ancestry. "auto": the configured ancestry with the highest mean global ancestry over the
+    cohort FAM samples, from results/global_ancestry.tsv (RFMix MSP-derived), after collapsing source aliases
+    (e.g. AFR + Africa). Outcome-free. Returns (ancestry, info); info is written to
+    results/primary_ancestry_selection.json.
+    """
+    a = cfg['association']; configured = a['primary_ancestry']; root = Path(cfg['output_root'])
+    path = root / 'results/global_ancestry.tsv'
+    info = {'configured': configured, 'method': 'auto' if configured == 'auto' else 'explicit',
+            'candidates': list(a['ancestries']), 'source': str(path), 'statistic': 'mean global ancestry over cohort FAM samples',
+            'close_margin': PRIMARY_CLOSE_MARGIN, 'notes': []}
+    if not path.exists():
+        if configured == 'auto':
+            raise ValueError('primary_ancestry "auto" needs results/global_ancestry.tsv (run scoring first)')
+        info.update(selected=configured, mean_global_ancestry=None, majority=None)
+        return configured, info
+    q = read_table(path); collapsed = collapse_ancestry(q, 'Q_')
+    means = {c[2:]: float(collapsed[c].mean()) for c in collapsed}
+    ranked = sorted(((means[x], x) for x in a['ancestries'] if x in means), reverse=True)
+    if not ranked:
+        raise ValueError(f'None of association.ancestries {a["ancestries"]} is present in the RFMix ancestry labels {sorted(means)}')
+    majority = ranked[0][1]; margin = ranked[0][0] - ranked[1][0] if len(ranked) > 1 else None
+    selected = majority if configured == 'auto' else configured
+    if configured == 'auto' and margin is not None and margin < PRIMARY_CLOSE_MARGIN:
+        info['notes'].append(f'close call: {ranked[0][1]} {ranked[0][0]:.3f} vs {ranked[1][1]} {ranked[1][0]:.3f}; '
+                             'consider setting primary_ancestry explicitly')
+    if configured != 'auto' and configured != majority:
+        info['notes'].append(f'explicit primary_ancestry {configured} ({means.get(configured, float("nan")):.3f}) is not the '
+                             f'cohort-majority ancestry {majority} ({ranked[0][0]:.3f}); kept as the pre-specified hypothesis')
+    info.update(selected=selected, majority=majority, top_two_margin=None if margin is None else round(margin, 4),
+                mean_global_ancestry={k: round(v, 4) for k, v in sorted(means.items(), key=lambda kv: -kv[1])})
+    for note in info['notes']:
+        print('NOTE primary_ancestry: ' + note, flush=True)
+    if write:
+        atomic_json(root / 'results/primary_ancestry_selection.json', info)
+    return selected, info
 
 def subset_msp(cfg,chrom,fam,dest):
     source=Path(render(cfg['rfmix_msp_pattern'],chrom))

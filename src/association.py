@@ -3,12 +3,12 @@ import math,time
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from ancestry import collapse_ancestry
+from ancestry import collapse_ancestry,resolve_primary_ancestry
 from common import table,atomic_json,read_table,canonical
 from rfmix_utils import MSPData,safe_ancestry_label
-from firth import fit,FitFailure,bh,safe_exp
+from firth import fit,FitFailure,safe_exp
 
-ASSOC_COLS=['REGION_ID','CHR','CONS_START','CONS_END','MODEL','ANCESTRY','TESTED_TERM','FAMILY','STATUS','DETAIL','N','CASES','CONTROLS','CARRIERS','CARRIER_CASES','CARRIER_CONTROLS','NONCARRIERS','WEIGHTED_CARRIERS','CARRIER_LA_MIN','CARRIER_LA_MAX','LA1_EXTRAPOLATION','BETA','SE','OR','CI_LOW','CI_HIGH','P_VALUE','Q_VALUE','BONFERRONI_P','CONVERGED','ITERATIONS','MAX_SCORE','NULL_MAX_SCORE','CI_METHOD','P_METHOD','COVARIATES_USED','DROPPED_CONSTANTS','NOMINAL_ASSOCIATED','FDR_ASSOCIATED']
+ASSOC_COLS=['REGION_ID','CHR','CONS_START','CONS_END','MODEL','ANCESTRY','TESTED_TERM','FAMILY','STATUS','DETAIL','N','CASES','CONTROLS','CARRIERS','CARRIER_CASES','CARRIER_CONTROLS','NONCARRIERS','WEIGHTED_CARRIERS','CARRIER_LA_MIN','CARRIER_LA_MAX','LA1_EXTRAPOLATION','BETA','SE','OR','CI_LOW','CI_HIGH','P_VALUE','CONVERGED','ITERATIONS','MAX_SCORE','NULL_MAX_SCORE','CI_METHOD','P_METHOD','COVARIATES_USED','DROPPED_CONSTANTS','NOMINAL_ASSOCIATED']
 
 def one_model(base,cfg,model,ancestry='',global_cols=(),target='ROH',extra=()):
     a=cfg['association'];t=time.monotonic()
@@ -64,13 +64,14 @@ def run_associations(cfg,regions,members,global_q):
     omit='Q_'+reference if 'Q_'+reference in all_q else all_q[-1]
     qcols=[x for x in all_q if x!=omit]
     base=pheno.merge(q,on='IID',validate='one_to_one');hc=regions[regions.HIGH_CONFIDENCE.eq(1)]
+    primary,primary_info=resolve_primary_ancestry(cfg)
     rows=[];local_rows=[];msp=None;chrom=None
     adjustment=''.join(' + '+x for x in cfg['association']['covariates'])
     models_manifest={'project':cfg['project'],'cohort':cfg['cohort_label'],'M0':'AD ~ ROH','M1':'AD ~ ROH'+adjustment,
     'M2_APOE':'M1 + APOE4','ROHxE':'AD ~ ROH + APOE4 + ROH:APOE4'+adjustment+'; tests interaction',
     'LA':'AD ~ ROH + (LA - 1) + ROH:(LA - 1)'+adjustment+' + global ancestry K-1; tests ROH at LA=1',
-    'primary_ancestry':cfg['association']['primary_ancestry'],'global_reference_used':omit,
-    'multiplicity':'BH and Bonferroni separately for all ancestry tests jointly, pooled M1 tests, and all secondary tests jointly; only converged fits enter correction',
+    'primary_ancestry':primary,'primary_ancestry_selection':primary_info,'global_reference_used':omit,
+    'multiplicity':'None: P values are nominal (unadjusted). Cohort size and the number of high-confidence regions give no power after multiple-testing correction; associations are exploratory and are judged by replication across cohorts.',
     'CI_method':'Firth-Wald approximation','P_method':'Profile penalized likelihood-ratio; constrained coefficient fit retains the full Jeffreys determinant',
     'relatedness':'No kinship/random effect. Closely related participants require a separately designed sensitivity/relatedness analysis.'}
     for r in hc.sort_values(['CHR','CONS_START']).itertuples(index=False):
@@ -96,16 +97,10 @@ def run_associations(cfg,regions,members,global_q):
         local=collapsed.copy();local.insert(0,'IID',d.IID.to_numpy());local.insert(0,'REGION_ID',r.REGION_ID);local['ROH']=d.ROH.to_numpy();local_rows.append(local)
         if len(rows)%35==0:print(f'Association: {len(rows)} model rows completed',flush=True)
     result=pd.DataFrame(rows).reindex(columns=ASSOC_COLS)
-    for family in result.FAMILY.dropna().unique():
-        ix=result.index[(result.FAMILY==family)&result.CONVERGED.eq(1)]
-        pv=pd.to_numeric(result.loc[ix,'P_VALUE'],errors='coerce').to_numpy(float)
-        result.loc[ix,'Q_VALUE']=bh(pv);result.loc[ix,'BONFERRONI_P']=np.minimum(1.,pv*len(pv))
     result['NOMINAL_ASSOCIATED']=(result.CONVERGED.eq(1)&pd.to_numeric(result.P_VALUE,errors='coerce').lt(cfg['association']['alpha'])).astype(int)
-    result['FDR_ASSOCIATED']=(result.CONVERGED.eq(1)&pd.to_numeric(result.Q_VALUE,errors='coerce').lt(cfg['association']['alpha'])).astype(int)
     table(out/'results/associations.tsv',result)
     table(out/'results/AD_associated_nominal.tsv',result[result.NOMINAL_ASSOCIATED.eq(1)])
-    table(out/'results/AD_associated_FDR.tsv',result[result.FDR_ASSOCIATED.eq(1)])
-    table(out/'results'/f'primary_{cfg["association"]["primary_ancestry"]}_associations.tsv',result[result.MODEL.eq('LA_'+cfg['association']['primary_ancestry'])])
+    table(out/'results'/f'primary_{primary}_associations.tsv',result[result.MODEL.eq('LA_'+primary)])
     l=pd.concat(local_rows,ignore_index=True) if local_rows else pd.DataFrame(columns=['REGION_ID','IID','ROH'])
     table(out/'results/local_ancestry_for_association.tsv.gz',l)
     atomic_json(out/'results/association_models.json',models_manifest)

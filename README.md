@@ -136,8 +136,8 @@ Individual stages can be (re)run as `chromosome <N>`, `finalize`, `associate` or
 │   ├── members.tsv.gz                 carriers of each region
 │   ├── associations.tsv               all AD models (M0 crude, M1 adjusted, APOE, ROH×APOE, local ancestry)
 │   ├── primary_<ANC>_associations.tsv models for the primary ancestry (e.g. NAM)
+│   ├── primary_ancestry_selection.json how the primary ancestry was chosen (explicit or auto) + mean global ancestry
 │   ├── AD_associated_nominal.tsv      nominal P < 0.05 (the paper reports nominal associations)
-│   ├── AD_associated_FDR.tsv          BH-adjusted, for reference
 │   ├── individual_ROH_burden.tsv      per-person raw and high-confidence ROH burden
 │   ├── global_ancestry.tsv, local_ancestry_for_association.tsv.gz
 │   └── locked_thresholds.tsv          thresholds actually applied (incl. the carrier floor for this N)
@@ -182,9 +182,21 @@ bash TRUROH_AD_Sensitivity/run.sh --config config/MY_COHORT.json --apoe-map TRUR
 | `chromosomes` | Autosomes to analyse |
 | `columns` | Source headers for `fid`, `iid`, `outcome`, `age`, `sex`, `apoe_genotype`, plus `covariates: {NAME: "Header"}` for extra numeric covariates |
 | `outcome_map`, `sex_map` | Source code → 0/1 (outcome 1 = case; sex 1 = female) |
-| `association` | `covariates`, `ancestries`, `primary_ancestry`, `global_reference`, fit settings, APOE models |
+| `association` | `covariates`, `ancestries`, `primary_ancestry` (an ancestry from `ancestries`, or `"auto"`), `global_reference`, fit settings, APOE models |
 | `resources` | `cpus`, `memory`, `time`, `max_concurrent`, `partition`, `account`, `constraint`, `final_*` |
 | `tools` | `plink`, `bcftools` executables |
+
+**`primary_ancestry`.** This setting only picks which ancestry's ROH × local-ancestry models form the pre-specified primary table
+(`primary_<ANC>_associations.tsv`). ROH calling and the locked gates never use it, and every configured ancestry is still fitted.
+Set it explicitly when you have a hypothesis. For example, the CH and GAPP configs use `NAM` for Native American founder ROH, although CH is
+majority European. `"auto"` picks the configured ancestry with the highest mean global ancestry across the cohort's samples,
+computed from the RFMix output after merging source aliases (AFR + Africa, EUR + Europe, AMR + America). It never uses the
+outcome. Either way the choice, the mean global ancestries and any note are written to `results/primary_ancestry_selection.json`. Notes flag an
+`auto` close call (top two within 0.05) or an explicit choice that is not the cohort majority.
+
+**Multiple testing.** P values are nominal. No BH, Bonferroni or Holm correction is applied: with the number of individuals and
+high-confidence regions in these cohorts, corrected tests have essentially no power. Associations are exploratory and are judged by
+replication across cohorts.
 
 `Age`/`AGE` and `Sex`/`SEX` normalize to `AGE` and `SEX`; PCs to `PC1`–`PC5`. Empty
 partition/account/constraint values are omitted from `sbatch`. `final_constraint` defaults to

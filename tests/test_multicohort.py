@@ -18,6 +18,7 @@ from common import atomic_json, file_hash, load_config, read_table, LOCK, carrie
 from configuration import guard_output
 from pipeline import check_manifest, config_signature, finalize, preflight, submit
 from phenotypes import prepare_phenotypes
+from ancestry import collapse_ancestry
 
 
 def save_config(cfg, destination):
@@ -231,6 +232,39 @@ class MultiCohortTests(unittest.TestCase):
         self.assertEqual(summary['state'], 'COMPLETE')
         self.assertEqual(summary['locked'], LOCK)
         self.assertEqual(read_table(root / 'results/regions_scored.tsv').HIGH_CONFIDENCE.tolist(), [1, 1])
+
+    def test_auto_primary_ancestry_and_nominal_only_outputs(self):
+        self.cfg['association'].update(primary_ancestry='auto', ancestries=['NAM', 'EUR', 'AFR'])
+        root = finish_fixture(self.cfg)
+        finalize(self.cfg)
+        sel = json.loads((root / 'results/primary_ancestry_selection.json').read_text())
+        q = collapse_ancestry(read_table(root / 'results/global_ancestry.tsv'), 'Q_')
+        means = {c[2:]: q[c].mean() for c in q if c[2:] in ['NAM', 'EUR', 'AFR']}
+        self.assertEqual(sel['method'], 'auto')
+        self.assertEqual(sel['selected'], max(means, key=means.get))
+        self.assertTrue((root / f"results/primary_{sel['selected']}_associations.tsv").is_file())
+        self.assertEqual(json.loads((root / 'results/association_models.json').read_text())['primary_ancestry'], sel['selected'])
+        assoc = read_table(root / 'results/associations.tsv')
+        self.assertFalse({'Q_VALUE', 'BONFERRONI_P', 'FDR_ASSOCIATED'} & set(assoc.columns))
+        self.assertFalse((root / 'results/AD_associated_FDR.tsv').exists())
+        self.assertNotIn('FDR', (root / 'report/TRUROH_CH_report.html').read_text())
+
+    def test_explicit_primary_ancestry_is_kept_and_noted(self):
+        self.cfg['association'].update(primary_ancestry='AFR', ancestries=['NAM', 'EUR', 'AFR'])
+        root = finish_fixture(self.cfg)
+        finalize(self.cfg)
+        sel = json.loads((root / 'results/primary_ancestry_selection.json').read_text())
+        self.assertEqual((sel['method'], sel['selected']), ('explicit', 'AFR'))
+        self.assertEqual(bool(sel['notes']), sel['majority'] != 'AFR')
+
+    def test_auto_primary_ancestry_config_validation(self):
+        cfg = json.loads(self.path.read_text())
+        cfg['association']['primary_ancestry'] = 'AUTO'
+        path = self.base / 'auto.json'; path.write_text(json.dumps(cfg))
+        self.assertEqual(load_config(path)['association']['primary_ancestry'], 'auto')
+        cfg['association']['primary_ancestry'] = 'SAS'; path.write_text(json.dumps(cfg))
+        with self.assertRaisesRegex(ValueError, 'auto'):
+            load_config(path)
 
     def test_missing_ch_input_generates_ch_diagnostic_report(self):
         Path(self.cfg['phenotype_file']).unlink()

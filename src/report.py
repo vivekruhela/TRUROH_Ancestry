@@ -9,7 +9,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from common import LOCK,CHROM_LENGTHS,read_table,atomic_json,table,chromosomes
-from ancestry import collapse_ancestry
+from ancestry import collapse_ancestry,resolve_primary_ancestry
 from configuration import analysis_fingerprint, guard_output
 
 COLORS={'NAM':'#82ac14','EUR':'#29a4df','AFR':'#9c27b0'}
@@ -18,7 +18,9 @@ def optional_table(p):return read_table(p) if p.exists() else pd.DataFrame()
 def empty(ax,message):ax.text(.5,.5,message,ha='center',va='center',transform=ax.transAxes,wrap=True,color='#52616b');ax.set_axis_off()
 def make_report(cfg):
     guard_output(cfg,claim=True)
-    project=cfg['project'];label=cfg['cohort_label'];primary=cfg['association']['primary_ancestry']
+    project=cfg['project'];label=cfg['cohort_label']
+    try:primary,_=resolve_primary_ancestry(cfg,write=False)
+    except (ValueError,OSError,KeyError):primary=cfg['association']['primary_ancestry']   # diagnostic report before scoring
     stem=f'TRUROH_{project}_report'
     root=Path(cfg['output_root']);out=root/'report';out.mkdir(parents=True,exist_ok=True);figdir=out/'figures';figdir.mkdir(exist_ok=True)
     manifest=load_json(root/'run_manifest.json');final=load_json(root/'final_status.json');pre=load_json(root/'preflight_status.json');audit=load_json(root/'inputs/phenotype_audit.json')
@@ -42,10 +44,10 @@ def make_report(cfg):
     'minimum_carriers':manifest.get('locked_min_carriers'),'association_enabled':cfg['association']['enabled'],
     'converged_association_models':int(assoc.CONVERGED.eq(1).sum()) if not assoc.empty else 0,
     'nominal_associated_unique_regions':int(assoc.loc[assoc.NOMINAL_ASSOCIATED.eq(1),'REGION_ID'].nunique()) if not assoc.empty else 0,
-    'FDR_associated_unique_regions':int(assoc.loc[assoc.FDR_ASSOCIATED.eq(1),'REGION_ID'].nunique()) if not assoc.empty else 0,
+    'primary_ancestry':primary,
     'error':final.get('error',pre.get('error',''))}
     if not complete:
-        summary['converged_association_models']=summary['nominal_associated_unique_regions']=summary['FDR_associated_unique_regions']=None
+        summary['converged_association_models']=summary['nominal_associated_unique_regions']=None
     atomic_json(out/'summary.json',summary)
     plt.rcParams.update({'font.size':10,'axes.spines.top':False,'axes.spines.right':False,'figure.facecolor':'white','savefig.facecolor':'white','axes.titleweight':'bold'})
     figures=[]
@@ -59,12 +61,12 @@ def make_report(cfg):
                                 f"Candidate regions: {summary['candidate_regions']}; high-confidence regions: {hc}",
                                 f"AD controls: {audit.get('AD_controls','NA')}; cases: {audit.get('AD_cases','NA')}; missing outcome: {audit.get('AD_unknown','NA')}",
                                 f"M1 complete-case samples: {audit.get('M1_complete_N','NA')}; technical scoring uses all {label} genotyped samples.",
-                                f"Converged model rows: {summary['converged_association_models']}; FDR-associated distinct regions: {summary['FDR_associated_unique_regions']}",
+                                f"Converged model rows: {summary['converged_association_models']}; nominally associated distinct regions (P < {cfg['association']['alpha']}): {summary['nominal_associated_unique_regions']}; primary ancestry: {primary}",
                                 'HVR and HRS gates use raw regional summaries; RDI uses source LOCO ancestry correction.',
                                 'No new knee, threshold tuning, disease-based ROH selection, or real-data truth labels.',
                                 'Firth p-values: penalized likelihood-ratio; intervals: Wald approximation.',
                                 'Ancestry-specific effects evaluate ROH at interval-average local ancestry = 1.',
-                                'Nominal and FDR associations are reported separately; association is not evidence of ROH ground truth.']
+                                'P values are nominal (no multiple-testing correction: too few individuals/regions for power after correction); association is not evidence of ROH ground truth.']
         import textwrap
         if summary['error']:desc.append('Error: '+summary['error'][:500]+' (full details in HTML/summary.json)')
         text='\n\n'.join('\n'.join(textwrap.wrap(x,112)) for x in desc)
@@ -154,11 +156,11 @@ def make_report(cfg):
         fields=['REGION_ID','CHR','CONS_START','CONS_END','LENGTH_BP','N_CARRIERS','MEDIAN_HVR_RAW','MEAN_HRS_RAW','RDI_A','HIGH_CONFIDENCE','GENES']
         parts+=['<h2>High-confidence intervals (first 100; complete results in TSV)</h2><div class="scroll">'+scored[scored.HIGH_CONFIDENCE.eq(1)][fields].head(100).to_html(index=False,escape=True)+'</div>']
     if not assoc.empty:
-        fields=['REGION_ID','MODEL','ANCESTRY','N','CARRIERS','OR','CI_LOW','CI_HIGH','P_VALUE','Q_VALUE','STATUS']
+        fields=['REGION_ID','MODEL','ANCESTRY','N','CARRIERS','OR','CI_LOW','CI_HIGH','P_VALUE','STATUS']
         parts+=['<h2>Association results (100 smallest converged p-values)</h2><div class="scroll">'+assoc[assoc.CONVERGED.eq(1)].sort_values('P_VALUE')[fields].head(100).to_html(index=False,escape=True)+'</div>',
-    '<p>P-values use the Firth profile penalized likelihood-ratio test. Confidence intervals are Wald approximations. BH correction is applied within the documented test families. An effect at local ancestry 1 can require extrapolation; this is flagged in associations.tsv. The model does not include a kinship random effect.</p>']
+    '<p>P-values use the Firth profile penalized likelihood-ratio test. Confidence intervals are Wald approximations. P values are nominal: no multiple-testing correction is applied, because cohort size and the number of high-confidence regions give no power after correction; associations are exploratory and should be judged by replication across cohorts. An effect at local ancestry 1 can require extrapolation; this is flagged in associations.tsv. The model does not include a kinship random effect.</p>']
     links=[('PDF report',stem+'.pdf'),('Run summary','summary.json'),('Chromosome status','chromosome_status.tsv')]
-    for name in ['regions_scored.tsv','high_confidence_ROH.tsv','individual_scored.tsv.gz','members.tsv.gz','associations.tsv',f'primary_{primary}_associations.tsv','AD_associated_nominal.tsv','AD_associated_FDR.tsv','global_ancestry.tsv','individual_ROH_burden.tsv','locked_thresholds.tsv','association_models.json','scoring_audit.json']:
+    for name in ['regions_scored.tsv','high_confidence_ROH.tsv','individual_scored.tsv.gz','members.tsv.gz','associations.tsv',f'primary_{primary}_associations.tsv','AD_associated_nominal.tsv','primary_ancestry_selection.json','global_ancestry.tsv','individual_ROH_burden.tsv','locked_thresholds.tsv','association_models.json','scoring_audit.json']:
         if (root/'results'/name).exists():links.append((name,'../results/'+name))
     parts+=['<h2>Files</h2><ul>']+['<li><a href="'+html.escape(url)+'">'+html.escape(label)+'</a></li>' for label,url in links]+['</ul>',
     '<p>Source protocol: TRUROH-SIM v3.8.0. A separate seed panel is pruned for HRS; BCFtools input is not LD-pruned. See the package docs for the equations, ancestry-source handling, assumptions, and software references.</p></body></html>']
